@@ -44,8 +44,8 @@ def GetAlphaFoldProteinsUsed():
     return proteinIDs
 
 
-def GetProteinMap():
-    path = "Data/AlphaFoldDBEncoded/"
+def GetProteinMap(rel_path=""):
+    path = rel_path + "Data/AlphaFoldDBEncoded/"
 
     AlphaFoldResults = [
         f[:-3]
@@ -66,7 +66,7 @@ def GetProteinMap():
     #   Is in AlphaFold
     #   Is atmost 1500 amino acids long
     #   Is not in blacklist (AlphaFold and JSON sequence does not match)
-    with open("Data/DeepTMHMM.partitions.json", "r") as FileObj:
+    with open(rel_path + "Data/DeepTMHMM.partitions.json", "r") as FileObj:
         CVs = json.loads(FileObj.read())
         for cv in CVs.keys():
             cvProteins = CVs[cv]
