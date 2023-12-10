@@ -18,16 +18,18 @@ from utils.setup import GetCustomProteinDatasetPadded, GetCVProteins
 # import esm
 import numpy as np
 import os
+
+# import requests
+# import json
+# from tqdm import tqdm
+# import pandas as pd
+
 import utils.metrics_utils as mu
 
 # from torch.utils.data import Dataset
 
-# from torchvision import datasets
-# from torchvision.transforms import ToTensor
 from sklearn import metrics
 import torch.optim as optim
-
-# import torchvision.transforms as T
 
 encode_length = 1500
 print_error_type_pairs = False
@@ -38,95 +40,46 @@ CVProteins = GetCVProteins()
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-print("using device:", device)
-
 
 # Model
-class Model(nn.Module):
-    def __init__(self, num_classes):
-        super(Model, self).__init__()
-        self.num_classes = num_classes
-        self.channels = 512
-        self.length = 1500
-        self.hidden1 = 128
-        self.hidden2 = 64
-        self.hidden3 = 32
-        batchnorm = nn.BatchNorm1d
-        self.linear = nn.Linear(self.hidden3, self.num_classes)
-        self.dropout = nn.Dropout(p=0.2)
-        activation_fn = nn.ReLU
+class LSTMModel(nn.Module):
+    def __init__(self):
+        super(LSTMModel, self).__init__()
+        self.input_d = 512
+        self.output_d = 7
+        self.hidden_dim = 128
+        self.layer_dim = 1
 
-        self.conv_net = nn.Sequential(
-            nn.Conv1d(self.channels, self.hidden1, 21, padding=10),
-            batchnorm(self.hidden1),
-            activation_fn(),
-            nn.Conv1d(self.hidden1, self.hidden2, 9, padding=4),
-            batchnorm(self.hidden2),
-            activation_fn(),
-            nn.Conv1d(self.hidden2, self.hidden3, 11, padding=5),
-            activation_fn(),
+        # LSTM model
+        self.lstm = nn.LSTM(
+            self.input_d,
+            self.hidden_dim,
+            self.layer_dim,
+            batch_first=True,
+            bidirectional=True,
         )
 
-        # Convolution part
-        in_channels = self.num_classes
-        out_channels = in_channels
-        groups = in_channels
-
-        # from paper using gaussian smoothing on output
-        kernel_width = 7
-        kernel_std = 1
-
-        kernel1D = torch.tensor(gaussian(kernel_width, kernel_std)).float()
-        weights = torch.stack(
-            [torch.zeros(kernel_width) for i in range((in_channels // groups - 1) // 2)]
-            + [kernel1D]
-            + [
-                torch.zeros(kernel_width)
-                for i in range((in_channels // groups - 1) // 2)
-            ]
-        )
-        self.smoothing_weights = torch.stack([weights for i in range(out_channels)]).to(
-            device
-        )
-        self.smoothing_groups = groups
+        # Linear Layer
+        self.linear = nn.Linear(2 * self.hidden_dim, self.output_d)
 
     def forward(self, x):
-        x = self.conv_net(x)
-        x = self.dropout(x)
-        x = torch.transpose(x, 1, 2)
-        x = self.linear(x)
-        x = torch.transpose(x, 1, 2)
-
-        # 1d convolution
-        x = torch.nn.functional.pad(
-            x,
-            (
-                (self.smoothing_weights.shape[-1] - 1) // 2,
-                (self.smoothing_weights.shape[-1] - 1) // 2,
-            ),
-            mode="reflect",
+        hidden0 = (
+            torch.zeros(self.layer_dim * 2, x.size(0), self.hidden_dim)
+            .requires_grad_()
+            .to(device)
         )
-        x = torch.nn.functional.conv1d(
-            x, self.smoothing_weights, groups=self.smoothing_groups
+
+        cell0 = (
+            torch.zeros(self.layer_dim * 2, x.size(0), self.hidden_dim)
+            .requires_grad_()
+            .to(device)
         )
-        return x
 
+        output, (hidden_n, cell_n) = self.lstm(x, (hidden0.detach(), cell0.detach()))
 
-def gaussian(M, std, sym=True):
-    if M < 1:
-        return np.array([])
-    if M == 1:
-        return np.ones(1, "d")
+        output = self.linear(output[:, :, :])
 
-    odd = M % 2
-    if not sym and not odd:
-        M = M + 1
-    n = np.arange(0, M) - (M - 1) / 2
-    sig2 = 2 * std * std
-    w = np.exp(-(n**2) / sig2) / np.sqrt(2 * np.pi) / std
-    if not sym and not odd:
-        w = w[:-1]
-    return w
+        return output
 
 
 # Accuracy
@@ -142,7 +95,7 @@ def train_model(model, train_dataset, validation_dataset):
     loss_fn = nn.CrossEntropyLoss(ignore_index=-1)
 
     # Optimizer
-    optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-3)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-6)
 
     batch_size = 32
 
@@ -162,7 +115,7 @@ def train_model(model, train_dataset, validation_dataset):
         drop_last=False,
     )
 
-    num_epochs = 200
+    num_epochs = 100
     validation_every_steps = 50
 
     step = 0
@@ -181,10 +134,11 @@ def train_model(model, train_dataset, validation_dataset):
                 device
             )
 
-            # Forward pass, compute gradients, perform one training step
-            output_train = model(inputs_train[:, :-1, :])
+            model.zero_grad()
+            output_train = model(inputs_train[:, :-1, :].permute(0, 2, 1)).permute(
+                0, 2, 1
+            )
             loss = loss_fn(output_train, targets_train)
-            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
@@ -224,7 +178,9 @@ def train_model(model, train_dataset, validation_dataset):
                         inputs_val, targets_val = inputs_val.to(device), targets_val.to(
                             device
                         )
-                        output_val = model(inputs_val[:, :-1, :])
+                        output_val = model(
+                            inputs_val[:, :-1, :].permute(0, 2, 1)
+                        ).permute(0, 2, 1)
 
                         predictions_val = output_val.max(1)[1]
 
@@ -303,7 +259,7 @@ def test_model(model, test_dataset):
         for batch in test_loader:
             inputs, targets = batch
             inputs, tragets = inputs.to(device), targets.to(device)
-            output = model(inputs[:, :-1, :])
+            output = model(inputs[:, :-1, :].permute(0, 2, 1)).permute(0, 2, 1)
 
             predictions = output.max(1)[1]
 
@@ -347,7 +303,9 @@ def test_model(model, test_dataset):
 
 n_cv = CVProteins.keys().__len__()
 
+
 n_unique_labels = 7
+
 
 for loop in range(1):
     print("---------------------------------------------------------------------------")
@@ -366,16 +324,10 @@ for loop in range(1):
         + CVProteins["cv" + str((loop + 1) % 5)]
         + CVProteins["cv" + str((loop + 2) % 5)]
     )
-    print("encoded training proteins")
     validation_dataset = CustomProteinDataset(CVProteins["cv" + str((loop + 3) % 5)])
-    print("encoded validation proteins")
     test_dataset = CustomProteinDataset(CVProteins["cv" + str((loop + 4) % 5)])
-    print("encoded testing proteins")
 
-    model = Model(n_unique_labels).to(device)
-
-    print("training model")
+    model = LSTMModel().to(device)  # Model(n_unique_labels)#.to(device)
+    torch.cuda.empty_cache()
     trained_model = train_model(model, train_dataset, validation_dataset)
-
-    print("testing model")
     test_model(trained_model, test_dataset)

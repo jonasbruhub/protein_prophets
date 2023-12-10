@@ -1,25 +1,35 @@
+import sys
+import os
+import inspect
+
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.append(parentdir)
+
 import torch
 import torch.nn as nn
 
 # import torch_geometric
 # import torch_sparse
 from utils.setup import GetCustomProteinDatasetPadded, GetCVProteins
-from torch_geometric.nn import MessagePassing
+
+# from torch_geometric.nn import MessagePassing
 
 # import esm
 import numpy as np
 import os
-import requests
-import json
-from tqdm import tqdm
-import pandas as pd
+
+# import requests
+# import json
+# from tqdm import tqdm
+# import pandas as pd
 
 import utils.metrics_utils as mu
 
 # import matplotlib.pyplot as plt
 # from sklearn.preprocessing import OneHotEncoder
 # from sklearn.preprocessing import LabelEncoder
-from torch.utils.data import Dataset
+# from torch.utils.data import Dataset
 
 # from torchvision import datasets
 # from torchvision.transforms import ToTensor
@@ -56,6 +66,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 #         tag_scores = F.log_softmax(tag_space, dim=1)
 #         return tag_scores
 
+
 # Model
 class LSTMModel(nn.Module):
     def __init__(self):
@@ -67,22 +78,30 @@ class LSTMModel(nn.Module):
         self.layer_dim = 1
 
         # LSTM model
-        self.lstm = nn.LSTM(self.input_d, self.hidden_dim, self.layer_dim, batch_first=True)
+        self.lstm = nn.LSTM(
+            self.input_d, self.hidden_dim, self.layer_dim, batch_first=True
+        )
 
         self.linear = nn.Linear(self.hidden_dim, self.output_d)
-    
+
     def forward(self, x):
+        hidden0 = (
+            torch.zeros(self.layer_dim, x.size(0), self.hidden_dim)
+            .requires_grad_()
+            .to(device)
+        )
 
-        hidden0 = torch.zeros(self.layer_dim, x.size(0), self.hidden_dim).requires_grad_().to(device)
-
-        cell0 = torch.zeros(self.layer_dim, x.size(0), self.hidden_dim).requires_grad_().to(device)
+        cell0 = (
+            torch.zeros(self.layer_dim, x.size(0), self.hidden_dim)
+            .requires_grad_()
+            .to(device)
+        )
 
         output, (hidden_n, cell_n) = self.lstm(x, (hidden0.detach(), cell0.detach()))
 
         output = self.linear(output[:, :, :])
 
         return output
-
 
 
 # Accuracy
@@ -127,23 +146,23 @@ def train_model(model, train_dataset, validation_dataset):
     train_accuracies = []
     valid_accuracies = []
 
-
-
-
     for epoch in range(num_epochs):
         train_accuracies_batches = []
 
         for batch in train_loader:
             # Inputs are [batch_size, 512, 1500]: 1500 long (padded) proteins, encoded using esm to get 512 latent variables
             inputs_train, targets_train = batch
-            inputs_train, targets_train = inputs_train.to(device), targets_train.to(device)
+            inputs_train, targets_train = inputs_train.to(device), targets_train.to(
+                device
+            )
 
             model.zero_grad()
-            output_train = model(inputs_train[:, :-1, :].permute(0,2,1)).permute(0,2,1)
+            output_train = model(inputs_train[:, :-1, :].permute(0, 2, 1)).permute(
+                0, 2, 1
+            )
             loss = loss_fn(output_train, targets_train)
             loss.backward()
             optimizer.step()
-
 
             # Increment step counter
             step += 1
@@ -178,8 +197,12 @@ def train_model(model, train_dataset, validation_dataset):
 
                     for batch_val in validation_loader:
                         inputs_val, targets_val = batch_val
-                        inputs_val, targets_val = inputs_val.to(device), targets_val.to(device)
-                        output_val = model(inputs_val[:, :-1, :].permute(0,2,1)).permute(0,2,1)
+                        inputs_val, targets_val = inputs_val.to(device), targets_val.to(
+                            device
+                        )
+                        output_val = model(
+                            inputs_val[:, :-1, :].permute(0, 2, 1)
+                        ).permute(0, 2, 1)
 
                         predictions_val = output_val.max(1)[1]
 
@@ -258,7 +281,7 @@ def test_model(model, test_dataset):
         for batch in test_loader:
             inputs, targets = batch
             inputs, tragets = inputs.to(device), targets.to(device)
-            output = model(inputs[:, :-1, :].permute(0,2,1)).permute(0,2,1)
+            output = model(inputs[:, :-1, :].permute(0, 2, 1)).permute(0, 2, 1)
 
             predictions = output.max(1)[1]
 
@@ -341,7 +364,7 @@ n_unique_labels = 7
 for loop in range(1):
     print("---------------------------------------------------------------------------")
     print(
-         f"-                           Loop {loop:<8}                                 -"
+        f"-                           Loop {loop:<8}                                 -"
     )
     print(
         f"-  train sets: cv{str((loop + 0) % 5):<1}, cv{str((loop + 1) % 5):<1}, cv{str((loop + 2) % 5):<1}"
@@ -355,12 +378,9 @@ for loop in range(1):
         + CVProteins["cv" + str((loop + 1) % 5)]
         + CVProteins["cv" + str((loop + 2) % 5)]
     )
-    validation_dataset = CustomProteinDataset(
-        CVProteins["cv" + str((loop + 3) % 5)]
-    )
+    validation_dataset = CustomProteinDataset(CVProteins["cv" + str((loop + 3) % 5)])
     test_dataset = CustomProteinDataset(CVProteins["cv" + str((loop + 4) % 5)])
 
-
-    model = LSTMModel().to(device) 
+    model = LSTMModel().to(device)
     trained_model = train_model(model, train_dataset, validation_dataset)
     test_model(trained_model, test_dataset)

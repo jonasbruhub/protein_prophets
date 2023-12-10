@@ -1,30 +1,34 @@
+import sys
+import os
+import inspect
+
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.append(parentdir)
+
 import torch
 import torch.nn as nn
 
 # import torch_geometric
 # import torch_sparse
 from utils.setup import GetCustomProteinDatasetPadded, GetCVProteins
-from torch_geometric.nn import MessagePassing
+
+# from torch_geometric.nn import MessagePassing
 
 # import esm
 import numpy as np
-import os
-import requests
-import json
-from tqdm import tqdm
-import pandas as pd
 
+# import os
 import utils.metrics_utils as mu
 
-# import matplotlib.pyplot as plt
-# from sklearn.preprocessing import OneHotEncoder
-# from sklearn.preprocessing import LabelEncoder
-from torch.utils.data import Dataset
+# from torch.utils.data import Dataset
 
 # from torchvision import datasets
 # from torchvision.transforms import ToTensor
 from sklearn import metrics
 import torch.optim as optim
+
+# import torchvision.transforms as T
 
 encode_length = 1500
 print_error_type_pairs = False
@@ -34,6 +38,9 @@ CustomProteinDataset = GetCustomProteinDatasetPadded(encode_length)
 CVProteins = GetCVProteins()
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
+print("using device:", device)
+
 
 # Model
 class Model(nn.Module):
@@ -50,7 +57,6 @@ class Model(nn.Module):
         self.dropout = nn.Dropout(p=0.2)
         activation_fn = nn.ReLU
 
-
         self.conv_net = nn.Sequential(
             nn.Conv1d(self.channels, self.hidden1, 21, padding=10),
             batchnorm(self.hidden1),
@@ -59,17 +65,69 @@ class Model(nn.Module):
             batchnorm(self.hidden2),
             activation_fn(),
             nn.Conv1d(self.hidden2, self.hidden3, 11, padding=5),
-            activation_fn()
+            activation_fn(),
         )
 
+        # Convolution part
+        in_channels = self.num_classes
+        out_channels = in_channels
+        groups = in_channels
+
+        # from paper using gaussian smoothing on output
+        kernel_width = 7
+        kernel_std = 1
+
+        kernel1D = torch.tensor(gaussian(kernel_width, kernel_std)).float()
+        weights = torch.stack(
+            [torch.zeros(kernel_width) for i in range((in_channels // groups - 1) // 2)]
+            + [kernel1D]
+            + [
+                torch.zeros(kernel_width)
+                for i in range((in_channels // groups - 1) // 2)
+            ]
+        )
+        self.smoothing_weights = torch.stack([weights for i in range(out_channels)]).to(
+            device
+        )
+        self.smoothing_groups = groups
 
     def forward(self, x):
         x = self.conv_net(x)
         x = self.dropout(x)
-        x = x.permute(0,2,1)
+        x = torch.transpose(x, 1, 2)
         x = self.linear(x)
-        x = x.permute(0,2,1)
+        x = torch.transpose(x, 1, 2)
+
+        # 1d convolution
+        x = torch.nn.functional.pad(
+            x,
+            (
+                (self.smoothing_weights.shape[-1] - 1) // 2,
+                (self.smoothing_weights.shape[-1] - 1) // 2,
+            ),
+            mode="reflect",
+        )
+        x = torch.nn.functional.conv1d(
+            x, self.smoothing_weights, groups=self.smoothing_groups
+        )
         return x
+
+
+def gaussian(M, std, sym=True):
+    if M < 1:
+        return np.array([])
+    if M == 1:
+        return np.ones(1, "d")
+
+    odd = M % 2
+    if not sym and not odd:
+        M = M + 1
+    n = np.arange(0, M) - (M - 1) / 2
+    sig2 = 2 * std * std
+    w = np.exp(-(n**2) / sig2) / np.sqrt(2 * np.pi) / std
+    if not sym and not odd:
+        w = w[:-1]
+    return w
 
 
 # Accuracy
@@ -120,7 +178,9 @@ def train_model(model, train_dataset, validation_dataset):
         for batch in train_loader:
             # Inputs are [batch_size, 512, 1500]: 1500 long (padded) proteins, encoded using esm to get 512 latent variables
             inputs_train, targets_train = batch
-            inputs_train, targets_train = inputs_train.to(device), targets_train.to(device)
+            inputs_train, targets_train = inputs_train.to(device), targets_train.to(
+                device
+            )
 
             # Forward pass, compute gradients, perform one training step
             output_train = model(inputs_train[:, :-1, :])
@@ -162,7 +222,9 @@ def train_model(model, train_dataset, validation_dataset):
 
                     for batch_val in validation_loader:
                         inputs_val, targets_val = batch_val
-                        inputs_val, targets_val = inputs_val.to(device), targets_val.to(device)
+                        inputs_val, targets_val = inputs_val.to(device), targets_val.to(
+                            device
+                        )
                         output_val = model(inputs_val[:, :-1, :])
 
                         predictions_val = output_val.max(1)[1]
@@ -286,46 +348,12 @@ def test_model(model, test_dataset):
 
 n_cv = CVProteins.keys().__len__()
 
-# cv0Indices = CVProteins["cv0"]
-# cv1Indices = CVProteins["cv1"]
-# cv2Indices = CVProteins["cv2"]
-# cv3Indices = CVProteins["cv3"]
-# cv4Indices = CVProteins["cv4"]
-
-
-# train_dataset_set = []
-
 n_unique_labels = 7
-
-# model1 = Model(n_unique_labels)
-# model2 = Model(n_unique_labels)
-# model3 = Model(n_unique_labels)
-# model4 = Model(n_unique_labels)
-# model5 = Model(n_unique_labels)
-
-# train_datasets = []
-# validation_datasets = []
-# test_datasets = []
-
-# for loop in range(CVProteins.keys().__len__()):
-#     train_datasets += [
-#         CustomProteinDataset(
-#             CVProteins["cv" + str((loop + 0) % 5)][0:10]
-#             + CVProteins["cv" + str((loop + 1) % 5)][0:10]
-#             + CVProteins["cv" + str((loop + 2) % 5)][0:10]
-#         )
-#     ]
-#     validation_datasets += [
-#         CustomProteinDataset(CVProteins["cv" + str((loop + 3) % 5)][0:10])
-#     ]
-#     test_datasets += [
-#         CustomProteinDataset(CVProteins["cv" + str((loop + 4) % 5)][0:10])
-#     ]
 
 for loop in range(1):
     print("---------------------------------------------------------------------------")
     print(
-         f"-                           Loop {loop:<8}                                 -"
+        f"-                           Loop {loop:<8}                                 -"
     )
     print(
         f"-  train sets: cv{str((loop + 0) % 5):<1}, cv{str((loop + 1) % 5):<1}, cv{str((loop + 2) % 5):<1}"
@@ -339,11 +367,16 @@ for loop in range(1):
         + CVProteins["cv" + str((loop + 1) % 5)]
         + CVProteins["cv" + str((loop + 2) % 5)]
     )
-    validation_dataset = CustomProteinDataset(
-        CVProteins["cv" + str((loop + 3) % 5)]
-    )
+    print("encoded training proteins")
+    validation_dataset = CustomProteinDataset(CVProteins["cv" + str((loop + 3) % 5)])
+    print("encoded validation proteins")
     test_dataset = CustomProteinDataset(CVProteins["cv" + str((loop + 4) % 5)])
+    print("encoded testing proteins")
 
     model = Model(n_unique_labels).to(device)
+
+    print("training model")
     trained_model = train_model(model, train_dataset, validation_dataset)
+
+    print("testing model")
     test_model(trained_model, test_dataset)
