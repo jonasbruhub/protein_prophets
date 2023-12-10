@@ -8,27 +8,12 @@ sys.path.append(parentdir)
 
 import torch
 import torch.nn as nn
-
-# import torch_geometric
-# import torch_sparse
-from utils.setup import GetCustomProteinDatasetPadded, GetCVProteins
-
-# from torch_geometric.nn import MessagePassing
-
-# import esm
 import numpy as np
 
-# import os
+from utils.setup import GetCustomProteinDatasetPadded, GetCVProteins
 import utils.metrics_utils as mu
-
-# from torch.utils.data import Dataset
-
-# from torchvision import datasets
-# from torchvision.transforms import ToTensor
 from sklearn import metrics
 import torch.optim as optim
-
-# import torchvision.transforms as T
 
 encode_length = 1500
 print_error_type_pairs = False
@@ -38,7 +23,6 @@ CustomProteinDataset = GetCustomProteinDatasetPadded(encode_length)
 CVProteins = GetCVProteins()
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
 print("using device:", device)
 
 

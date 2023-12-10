@@ -8,31 +8,10 @@ sys.path.append(parentdir)
 
 import torch
 import torch.nn as nn
-
-# import torch_geometric
-# import torch_sparse
-from utils.setup import GetCustomProteinDatasetPadded, GetCVProteins
-
-# from torch_geometric.nn import MessagePassing
-
-# import esm
 import numpy as np
-import os
 
-# import requests
-# import json
-# from tqdm import tqdm
-# import pandas as pd
-
+from utils.setup import GetCustomProteinDatasetPadded, GetCVProteins
 import utils.metrics_utils as mu
-
-# import matplotlib.pyplot as plt
-# from sklearn.preprocessing import OneHotEncoder
-# from sklearn.preprocessing import LabelEncoder
-# from torch.utils.data import Dataset
-
-# from torchvision import datasets
-# from torchvision.transforms import ToTensor
 from sklearn import metrics
 import torch.optim as optim
 
@@ -44,27 +23,7 @@ CustomProteinDataset = GetCustomProteinDatasetPadded(encode_length)
 CVProteins = GetCVProteins()
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
-
-# # LSTM model
-# class LSTMTagger(nn.Module):
-
-#     def __init__(self, embedding_dim, hidden_dim, vocab_size, tagset_size):
-#         super(LSTMTagger, self).__init__()
-#         self.hidden_dim = hidden_dim
-
-#         self.word_embeddings = nn.Embedding(vocab_size, embedding_dim)
-
-#         self.lstm = nn.LSTM(embedding_dim, hidden_dim,  bidirectional=True)
-
-#         self.hidden2tag = nn.Linear(hidden_dim, tagset_size)
-
-#     def forward(self, protein):
-#         embeds = self.word_embeddings(protein)
-#         lstm_out, _ = self.lstm(embeds.view(len(sentence), 1, -1))
-#         tag_space = self.hidden2tag(lstm_out.view(len(sentence), -1))
-#         tag_scores = F.log_softmax(tag_space, dim=1)
-#         return tag_scores
+print("using device:", device)
 
 
 # Model
@@ -324,42 +283,8 @@ def test_model(model, test_dataset):
 
 
 n_cv = CVProteins.keys().__len__()
-
-# cv0Indices = CVProteins["cv0"]
-# cv1Indices = CVProteins["cv1"]
-# cv2Indices = CVProteins["cv2"]
-# cv3Indices = CVProteins["cv3"]
-# cv4Indices = CVProteins["cv4"]
-
-
-# train_dataset_set = []
-
 n_unique_labels = 7
 
-# model1 = Model(n_unique_labels)
-# model2 = Model(n_unique_labels)
-# model3 = Model(n_unique_labels)
-# model4 = Model(n_unique_labels)
-# model5 = Model(n_unique_labels)
-
-# train_datasets = []
-# validation_datasets = []
-# test_datasets = []
-
-# for loop in range(CVProteins.keys().__len__()):
-#     train_datasets += [
-#         CustomProteinDataset(
-#             CVProteins["cv" + str((loop + 0) % 5)][0:10]
-#             + CVProteins["cv" + str((loop + 1) % 5)][0:10]
-#             + CVProteins["cv" + str((loop + 2) % 5)][0:10]
-#         )
-#     ]
-#     validation_datasets += [
-#         CustomProteinDataset(CVProteins["cv" + str((loop + 3) % 5)][0:10])
-#     ]
-#     test_datasets += [
-#         CustomProteinDataset(CVProteins["cv" + str((loop + 4) % 5)][0:10])
-#     ]
 
 for loop in range(1):
     print("---------------------------------------------------------------------------")

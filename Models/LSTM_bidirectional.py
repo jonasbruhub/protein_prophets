@@ -8,26 +8,10 @@ sys.path.append(parentdir)
 
 import torch
 import torch.nn as nn
-
-# import torch_geometric
-# import torch_sparse
-from utils.setup import GetCustomProteinDatasetPadded, GetCVProteins
-
-# from torch_geometric.nn import MessagePassing
-
-# import esm
 import numpy as np
-import os
 
-# import requests
-# import json
-# from tqdm import tqdm
-# import pandas as pd
-
+from utils.setup import GetCustomProteinDatasetPadded, GetCVProteins
 import utils.metrics_utils as mu
-
-# from torch.utils.data import Dataset
-
 from sklearn import metrics
 import torch.optim as optim
 
@@ -39,6 +23,7 @@ CustomProteinDataset = GetCustomProteinDatasetPadded(encode_length)
 CVProteins = GetCVProteins()
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
+print("using device:", device)
 
 
 # Model
@@ -302,8 +287,6 @@ def test_model(model, test_dataset):
 
 
 n_cv = CVProteins.keys().__len__()
-
-
 n_unique_labels = 7
 
 
