@@ -24,8 +24,8 @@ test_data = cvs["cv4"]
 
 
 # Only take a subset of data
-training_data = training_data[:2]
-validation_data = validation_data[:2]
+# training_data = training_data[:2]
+# validation_data = validation_data[:2]
 
 
 
@@ -215,7 +215,7 @@ model = BiLSTM_CRF(tag_to_ix, EMBEDDING_DIM, HIDDEN_DIM).to(device)
 # Check predictions before training
 with torch.no_grad():
     print("Prediction before training")
-    model_pred = model(training_data[0][0])
+    model_pred = model(training_data[0][0].to(device))
     pred_label = ''.join([tag_to_ix_inv[w] for w in model_pred[1]])
     print( f"  predict: { pred_label }")
     print( f"  target:  {''.join(training_data[0][1])}")
@@ -400,7 +400,7 @@ print("\n\n\nA sanity check on first training input. Prediction and target")
 with torch.no_grad():
     # Input should just be latent structure
     print("Prediction after training")
-    model_pred = model(training_data[0][0])
+    model_pred = model(training_data[0][0].to(device))
     pred_label = ''.join([tag_to_ix_inv[w] for w in model_pred[1]])
     print( f"  predict: { pred_label }")
     print( f"  target:  {''.join(training_data[0][1])}")
