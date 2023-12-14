@@ -73,7 +73,7 @@ class BiLSTM_CRF(nn.Module):
         # Matrix of transition parameters.  Entry i,j is the score of
         # transitioning *to* i *from* j.
         self.transitions = nn.Parameter(
-            torch.randn(self.tagset_size, self.tagset_size))
+            torch.randn(self.tagset_size, self.tagset_size).to(device))
 
         # These two statements enforce the constraint that we never transfer
         # to the start tag and we never transfer from the stop tag
@@ -83,12 +83,12 @@ class BiLSTM_CRF(nn.Module):
         self.hidden = self.init_hidden()
 
     def init_hidden(self):
-        return (torch.randn(2, 1, self.hidden_dim // 2),
-                torch.randn(2, 1, self.hidden_dim // 2))
+        return (torch.randn(2, 1, self.hidden_dim // 2).to(device),
+                torch.randn(2, 1, self.hidden_dim // 2).to(device))
 
     def _forward_alg(self, feats):
         # Do the forward algorithm to compute the partition function
-        init_alphas = torch.full((1, self.tagset_size), -10000.)
+        init_alphas = torch.full((1, self.tagset_size), -10000.).to(device)
         # START_TAG has all of the score.
         init_alphas[0][self.tag_to_ix[START_TAG]] = 0.
 
@@ -112,7 +112,7 @@ class BiLSTM_CRF(nn.Module):
                 # The forward variable for this tag is log-sum-exp of all the
                 # scores.
                 alphas_t.append(log_sum_exp(next_tag_var).view(1))
-            forward_var = torch.cat(alphas_t).view(1, -1)
+            forward_var = torch.cat(alphas_t).view(1, -1).to(device)
         terminal_var = forward_var + self.transitions[self.tag_to_ix[STOP_TAG]]
         alpha = log_sum_exp(terminal_var)
         return alpha
@@ -132,8 +132,8 @@ class BiLSTM_CRF(nn.Module):
 
     def _score_sentence(self, feats, tags):
         # Gives the score of a provided tag sequence
-        score = torch.zeros(1)
-        tags = torch.cat([torch.tensor([self.tag_to_ix[START_TAG]], dtype=torch.long), tags])
+        score = torch.zeros(1).to(device)
+        tags = torch.cat([torch.tensor([self.tag_to_ix[START_TAG]], dtype=torch.long).to(device), tags])
         for i, feat in enumerate(feats):
             score = score + \
                 self.transitions[tags[i + 1], tags[i]] + feat[tags[i + 1]]
@@ -144,7 +144,7 @@ class BiLSTM_CRF(nn.Module):
         backpointers = []
 
         # Initialize the viterbi variables in log space
-        init_vvars = torch.full((1, self.tagset_size), -10000.)
+        init_vvars = torch.full((1, self.tagset_size), -10000.).to(device)
         init_vvars[0][self.tag_to_ix[START_TAG]] = 0
 
         # forward_var at step i holds the viterbi variables for step i-1
@@ -165,7 +165,7 @@ class BiLSTM_CRF(nn.Module):
                 viterbivars_t.append(next_tag_var[0][best_tag_id].view(1))
             # Now add in the emission scores, and assign forward_var to the set
             # of viterbi variables we just computed
-            forward_var = (torch.cat(viterbivars_t) + feat).view(1, -1)
+            forward_var = (torch.cat(viterbivars_t).to(device) + feat).view(1, -1)
             backpointers.append(bptrs_t)
 
         # Transition to STOP_TAG
@@ -212,13 +212,13 @@ tag_to_ix_inv = {0: "I", 1:"O", 2:"P", 3:"S", 4:"M", 5:"B", 6:START_TAG, 7:STOP_
 
 model = BiLSTM_CRF(tag_to_ix, EMBEDDING_DIM, HIDDEN_DIM).to(device)
 
-# Check predictions before training
-with torch.no_grad():
-    print("Prediction before training")
-    model_pred = model(training_data[0][0].to(device))
-    pred_label = ''.join([tag_to_ix_inv[w] for w in model_pred[1]])
-    print( f"  predict: { pred_label }")
-    print( f"  target:  {''.join(training_data[0][1])}")
+# # Check predictions before training
+# with torch.no_grad():
+#     print("Prediction before training")
+#     model_pred = model(training_data[0][0].to(device))
+#     pred_label = ''.join([tag_to_ix_inv[w] for w in model_pred[1]])
+#     print( f"  predict: { pred_label }")
+#     print( f"  target:  {''.join(training_data[0][1])}")
 
 
 # Adam or SGD
@@ -395,14 +395,14 @@ if print_error_type_pairs:
 
 
 
-print("\n\n\nA sanity check on first training input. Prediction and target")
-# Check predictions after training
-with torch.no_grad():
-    # Input should just be latent structure
-    print("Prediction after training")
-    model_pred = model(training_data[0][0].to(device))
-    pred_label = ''.join([tag_to_ix_inv[w] for w in model_pred[1]])
-    print( f"  predict: { pred_label }")
-    print( f"  target:  {''.join(training_data[0][1])}")
+# print("\n\n\nA sanity check on first training input. Prediction and target")
+# # Check predictions after training
+# with torch.no_grad():
+#     # Input should just be latent structure
+#     print("Prediction after training")
+#     model_pred = model(training_data[0][0].to(device))
+#     pred_label = ''.join([tag_to_ix_inv[w] for w in model_pred[1]])
+#     print( f"  predict: { pred_label }")
+#     print( f"  target:  {''.join(training_data[0][1])}")
 
-# We got it!
+# # We got it!
