@@ -93,6 +93,30 @@ def GetProteinMap(rel_path=""):
 
     return proteinMap
 
+def GetLSTMData():
+    # should return a dict {cv: list of [latent, label] }
+    proteinMap = GetProteinMap()
+    cvs = proteinMap["CV"].unique()
+    print(cvs)
+    path = "Data/AlphaFoldDBEncoded/"
+
+    foldDict = {}
+    for cv in cvs:
+        foldDict[cv] = []
+        print(f"preparing {cv[-1]} fold")
+        cvProteins = proteinMap[proteinMap["CV"] == cv]
+        for _, protein in tqdm(cvProteins.iterrows()):
+            
+            # Latent shoud be of size Lx512 from encoder. Is by default when loading precomputed
+            latent = torch.load(
+                    path + "/" + protein["proteinID"] + ".pt"
+                )
+            
+            # Label should be a list of characters = [S,S,S,S,P,P,B,B,...]
+            label = list(protein["labels"])
+            foldDict[cv] += [[latent.unsqueeze(1), label]]
+    return foldDict
+
 
 def GetCustomProteinDataset(encode_length=1500):
     proteinMap = GetProteinMap()

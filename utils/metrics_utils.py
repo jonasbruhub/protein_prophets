@@ -112,6 +112,8 @@ def is_topologies_equal(topology_a, topology_b, minimum_seqment_overlap=5):
 def calculate_acc(correct, total):
     total = total.float()
     correct = correct.float()
+    if correct == 0.0:
+        return 0
     if total == 0.0:
         return 1
     return correct / total

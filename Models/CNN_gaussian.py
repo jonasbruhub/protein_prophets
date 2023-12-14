@@ -178,6 +178,7 @@ def train_model(model, train_dataset, validation_dataset):
 
             # Compute accuracy
             predictions_train = output_train.max(1)[1]
+            # print(predictions_train)
 
             # Calculate accuracy for each protein in batch
             for idx in range(predictions_train.shape[0]):
