@@ -1,23 +1,15 @@
 import torch
 import torch.nn as nn
-
-# import torch_geometric
-# import torch_sparse
 from utils.setup import GetCustomProteinDatasetPadded, GetCVProteins
 from torch_geometric.nn import MessagePassing
-
-# import esm
 import numpy as np
 import os
 import requests
 import json
 from tqdm import tqdm
 import pandas as pd
-
 import utils.metrics_utils as mu
-
 from torch.utils.data import Dataset
-
 from sklearn import metrics
 import torch.optim as optim
 
@@ -304,7 +296,7 @@ for loop in range(1):
     test_dataset = CustomProteinDataset(CVProteins["cv" + str((loop + 4) % 5)])
 
 
-    model = LSTMModel().to(device) #Model(n_unique_labels)#.to(device)
+    model = LSTMModel().to(device)
     torch.cuda.empty_cache()
     trained_model = train_model(model, train_dataset, validation_dataset)
     test_model(trained_model, test_dataset)
