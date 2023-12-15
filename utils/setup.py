@@ -9,8 +9,8 @@ from tqdm import tqdm
 from utils.metrics_utils import LABELS, LABELS_INV
 
 
-def GetAlphaFoldProteinsUsed():
-    path = "Data/AlphaFoldDBEncoded/"
+def GetAlphaFoldProteinsUsed(rel_path=""):
+    path = rel_path + "Data/AlphaFoldDBEncoded/"
 
     AlphaFoldResults = [
         f[:-3]
@@ -27,7 +27,7 @@ def GetAlphaFoldProteinsUsed():
     proteinIDs = []
     AlphaFoldResultsSet = set(AlphaFoldResults)
 
-    with open("Data/DeepTMHMM.partitions.json", "r") as FileObj:
+    with open(rel_path + "Data/DeepTMHMM.partitions.json", "r") as FileObj:
         CVs = json.loads(FileObj.read())
         for cv in CVs.keys():
             cvProteins = CVs[cv]
