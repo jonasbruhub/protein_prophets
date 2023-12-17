@@ -1,3 +1,6 @@
+# Inspiration from pytorch tutorials
+# https://pytorch.org/tutorials/beginner/nlp/advanced_tutorial.html?fbclid=IwAR2NNcwPuDh57KxrZXU9BYT5RiVpX9nG2pEE18WyKStCf4q1iPHoV8thg3k
+
 import sys
 import os
 import inspect

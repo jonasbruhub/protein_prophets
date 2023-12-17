@@ -1,3 +1,6 @@
+# Inspiration from
+# https://wandb.ai/sauravmaheshkar/LSTM-PyTorch/reports/Using-LSTM-in-PyTorch-A-Tutorial-With-Examples--VmlldzoxMDA2NTA5?fbclid=IwAR0RX_QQCU9RvRUbL3bbgbcD_EiTCPqATgdUZ2nqNM1m-xLQZJf1ibJQiYk
+
 import sys
 import os
 import inspect
